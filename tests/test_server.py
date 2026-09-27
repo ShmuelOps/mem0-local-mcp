@@ -11,9 +11,9 @@ from mem0_local_mcp import server
 def isolated_store(tmp_path, monkeypatch):
     monkeypatch.setenv("MEM0_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("MEM0_USER", "test-user")
-    server.memory.cache_clear()
+    server._build_memory.cache_clear()
     yield
-    server.memory.cache_clear()
+    server._build_memory.cache_clear()
 
 
 def test_tools_registered():
@@ -40,3 +40,12 @@ def test_memories_are_scoped_per_user(monkeypatch):
     server.add_memory("secret belonging to test-user")
     monkeypatch.setenv("MEM0_USER", "someone-else")
     assert server.search_memory("secret") == "no memories"
+
+
+def test_concurrent_first_calls():
+    # MCP servers may run sync tools in parallel threads; the first calls race to build Memory().
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(8) as pool:
+        results = list(pool.map(lambda _: server.search_memory("x"), range(8)))
+    assert results == ["no memories"] * 8

@@ -1,26 +1,30 @@
 """Local mem0 long-term memory as an MCP server. No API key, no cloud."""
 
 import os
+import threading
 from functools import cache
 from pathlib import Path
 
 os.environ.setdefault("MEM0_TELEMETRY", "False")
 
-from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.server.mcpserver import MCPServer  # noqa: E402
 from mem0 import Memory  # noqa: E402
 
 DEFAULT_DATA_DIR = "~/.mem0-local-mcp"
 DEFAULT_EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 
-mcp = FastMCP("mem0")
+mcp = MCPServer("mem0")
 
 
 def _user() -> str:
     return os.environ.get("MEM0_USER", "default")
 
 
+_memory_lock = threading.Lock()
+
+
 @cache
-def memory() -> Memory:
+def _build_memory() -> Memory:
     data_dir = Path(os.environ.get("MEM0_DATA_DIR", DEFAULT_DATA_DIR)).expanduser()
     return Memory.from_config(
         {
@@ -39,6 +43,12 @@ def memory() -> Memory:
             "history_db_path": str(data_dir / "history.db"),
         }
     )
+
+
+def memory() -> Memory:
+    # MCP may run sync tools concurrently; Chroma client creation isn't thread-safe.
+    with _memory_lock:
+        return _build_memory()
 
 
 @mcp.tool()
