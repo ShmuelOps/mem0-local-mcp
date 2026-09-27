@@ -1,6 +1,9 @@
 """End-to-end tests: real mem0 + Chroma + FastEmbed, no mocks."""
 
 import asyncio
+import os
+import subprocess
+import sys
 
 import pytest
 
@@ -40,3 +43,13 @@ def test_memories_are_scoped_per_user(monkeypatch):
     server.add_memory("secret belonging to test-user")
     monkeypatch.setenv("MEM0_USER", "someone-else")
     assert server.search_memory("secret") == "no memories"
+
+
+def test_nothing_written_to_default_mem0_home(tmp_path):
+    # Fresh interpreter: mem0 decides its home dir at import time.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("MEM0_")}
+    env["HOME"] = str(tmp_path)
+    code = "from mem0_local_mcp import server; server.memory()"
+    subprocess.run([sys.executable, "-c", code], env=env, check=True, capture_output=True)
+    assert not (tmp_path / ".mem0").exists()
+    assert (tmp_path / ".mem0-local-mcp" / "config.json").exists()
