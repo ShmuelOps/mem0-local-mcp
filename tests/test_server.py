@@ -4,6 +4,7 @@ import asyncio
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -14,9 +15,9 @@ from mem0_local_mcp import server
 def isolated_store(tmp_path, monkeypatch):
     monkeypatch.setenv("MEM0_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("MEM0_USER", "test-user")
-    server.memory.cache_clear()
+    server._build_memory.cache_clear()
     yield
-    server.memory.cache_clear()
+    server._build_memory.cache_clear()
 
 
 def test_tools_registered():
@@ -53,3 +54,10 @@ def test_nothing_written_to_default_mem0_home(tmp_path):
     subprocess.run([sys.executable, "-c", code], env=env, check=True, capture_output=True)
     assert not (tmp_path / ".mem0").exists()
     assert (tmp_path / ".mem0-local-mcp" / "config.json").exists()
+
+
+def test_concurrent_first_calls():
+    # MCP servers may run sync tools in parallel threads; the first calls race to build Memory().
+    with ThreadPoolExecutor(8) as pool:
+        results = list(pool.map(lambda _: server.search_memory("x"), range(8)))
+    assert results == ["no memories"] * 8
