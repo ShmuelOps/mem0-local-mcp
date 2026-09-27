@@ -5,13 +5,17 @@ import threading
 from functools import cache
 from pathlib import Path
 
+DEFAULT_DATA_DIR = "~/.mem0-local-mcp"
+DEFAULT_EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+
 os.environ.setdefault("MEM0_TELEMETRY", "False")
+# mem0 writes config.json to MEM0_DIR (default ~/.mem0) at import; keep it with our data.
+os.environ.setdefault(
+    "MEM0_DIR", str(Path(os.environ.get("MEM0_DATA_DIR", DEFAULT_DATA_DIR)).expanduser())
+)
 
 from mcp.server.mcpserver import MCPServer  # noqa: E402
 from mem0 import Memory  # noqa: E402
-
-DEFAULT_DATA_DIR = "~/.mem0-local-mcp"
-DEFAULT_EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 
 mcp = MCPServer("mem0")
 
